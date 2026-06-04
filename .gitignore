@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# gh cli download
+gh_2.71.0_macOS_arm64/
+gh_2.71.0_macOS_arm64.zip
