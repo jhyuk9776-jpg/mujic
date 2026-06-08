@@ -72,7 +72,7 @@ export const MinimalistHero = ({
             </NavLink>
           ))}
           <a
-            href="#"
+            href="/auth"
             className="rounded-full bg-foreground px-4 py-1.5 text-xs font-semibold tracking-widest text-background transition-opacity hover:opacity-80"
           >
             GET STARTED

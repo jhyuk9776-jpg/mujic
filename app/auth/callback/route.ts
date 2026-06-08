@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
   // Where to send the user after a successful login.
-  const next = searchParams.get('next') ?? '/';
+  const next = searchParams.get('next') ?? '/auth/workspace';
 
   if (code) {
     const supabase = await createClient();

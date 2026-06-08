@@ -12,7 +12,7 @@ export default function Home() {
       logoText="mujic."
       navLinks={navLinks}
       mainText="Generate original, royalty-free music for your YouTube videos in seconds. AI-powered tracks crafted to match your content."
-      readMoreLink="#"
+      readMoreLink="/auth"
       imageSrc="https://ik.imagekit.io/fpxbgsota/image%2013.png?updatedAt=1753531863793"
       imageAlt="A portrait of a person in a black turtleneck, in profile."
       overlayText={{
