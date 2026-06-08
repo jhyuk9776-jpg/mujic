@@ -41,7 +41,13 @@ const SignOutIcon = ({ className }: { className?: string }) => (
     </svg>
 );
 
-export function WorkspaceNavbar({ className }: { className?: string }) {
+interface WorkspaceNavbarProps {
+    className?: string;
+    search?: string;
+    onSearchChange?: (value: string) => void;
+}
+
+export function WorkspaceNavbar({ className, search, onSearchChange }: WorkspaceNavbarProps) {
     const router = useRouter();
     const { user, signOut } = useAuth();
 
@@ -75,7 +81,7 @@ export function WorkspaceNavbar({ className }: { className?: string }) {
                 mujic.
             </span>
 
-            {/* Center — liquid glass search field (non-functional for now) */}
+            {/* Center — liquid glass search field (filters the track list by title) */}
             <div className="relative flex max-w-md flex-1 items-center">
                 <div
                     className={cn(
@@ -89,10 +95,25 @@ export function WorkspaceNavbar({ className }: { className?: string }) {
                     <SearchIcon className="shrink-0 text-white/40" />
                     <input
                         type="text"
+                        value={search ?? ''}
+                        onChange={(e) => onSearchChange?.(e.target.value)}
                         placeholder="Search your sound…"
                         aria-label="Search"
                         className="w-full bg-transparent text-sm text-white placeholder:text-white/35 focus:outline-none"
                     />
+                    {search && (
+                        <button
+                            type="button"
+                            onClick={() => onSearchChange?.('')}
+                            aria-label="Clear search"
+                            className="shrink-0 text-white/40 transition-colors hover:text-white/80"
+                        >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                        </button>
+                    )}
                 </div>
             </div>
 

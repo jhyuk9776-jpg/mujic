@@ -42,3 +42,122 @@ textarea::-webkit-scrollbar-thumb {
 textarea::-webkit-scrollbar-thumb:hover {
   background-color: #555555;
 }
+
+/* Music generation loading animation (components/workspace/loading-lines.tsx) */
+.loading-lines {
+  /* Per-instance knobs (overridable via inline style). */
+  --ll-color: #fff;
+  --ll-letter-duration: 4s;
+  --ll-transform-duration: 2s;
+  --ll-opacity-duration: 4s;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 120px;
+  font-weight: 600;
+  font-size: 1.6em;
+  color: var(--ll-color);
+  user-select: none;
+}
+.loading-lines__letter {
+  position: relative;
+  display: inline-block;
+  z-index: 2;
+  opacity: 0;
+  color: var(--ll-color);
+  animation: letterAnim var(--ll-letter-duration) linear infinite;
+}
+.loading-lines__mask {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: transparent;
+  -webkit-mask: repeating-linear-gradient(90deg, transparent 0, transparent 6px, black 7px, black 8px);
+  mask: repeating-linear-gradient(90deg, transparent 0, transparent 6px, black 7px, black 8px);
+}
+.loading-lines__gradient {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 50% 50%, #ff0 0%, transparent 50%),
+    radial-gradient(circle at 45% 45%, #f00 0%, transparent 45%),
+    radial-gradient(circle at 55% 55%, #0ff 0%, transparent 45%),
+    radial-gradient(circle at 45% 55%, #0f0 0%, transparent 45%),
+    radial-gradient(circle at 55% 45%, #00f 0%, transparent 45%);
+  -webkit-mask: radial-gradient(circle at 50% 50%, transparent 0%, transparent 10%, black 25%);
+  mask: radial-gradient(circle at 50% 50%, transparent 0%, transparent 10%, black 25%);
+  animation:
+    transformAnim var(--ll-transform-duration) infinite alternate cubic-bezier(0.6, 0.8, 0.5, 1),
+    opacityAnim var(--ll-opacity-duration) infinite;
+}
+
+@keyframes transformAnim {
+  0% { transform: translate(-55%); }
+  100% { transform: translate(55%); }
+}
+@keyframes opacityAnim {
+  0%, 100% { opacity: 0; }
+  15% { opacity: 1; }
+  65% { opacity: 0; }
+}
+@keyframes letterAnim {
+  0% { opacity: 0; }
+  5% {
+    opacity: 1;
+    text-shadow: 0 0 4px #fff;
+    transform: scale(1.1) translateY(-2px);
+  }
+  20% { opacity: 0.2; }
+  100% { opacity: 0; }
+}
+
+/* Music player sliders — seek & volume (components/workspace/music-player.tsx) */
+.player-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 9999px;
+  background: #4d4d4d;
+  cursor: pointer;
+}
+.player-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: none;
+}
+.player-range::-webkit-slider-thumb {
+  background: #c9a961;
+}
+.player-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: #c9a961;
+}
+
+/* Seek bar variant — sits flush on the player's top edge. Square corners and a
+   thumb that only appears on hover so it never pokes above the player. */
+.player-range--seek {
+  height: 3px;
+  border-radius: 0;
+}
+.player-range--seek::-webkit-slider-thumb {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.player-range--seek:hover::-webkit-slider-thumb {
+  opacity: 1;
+}
+.player-range--seek::-moz-range-thumb {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.player-range--seek:hover::-moz-range-thumb {
+  opacity: 1;
+}
