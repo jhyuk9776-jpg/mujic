@@ -1,8 +1,27 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth-provider';
 import { cn } from '@/lib/utils';
+import { CreditModal } from '@/components/workspace/credit-modal';
+
+const StarIcon = ({ className }: { className?: string }) => (
+    <svg
+        className={className}
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+    >
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+);
 
 const SearchIcon = ({ className }: { className?: string }) => (
     <svg
@@ -50,6 +69,7 @@ interface WorkspaceNavbarProps {
 export function WorkspaceNavbar({ className, search, onSearchChange }: WorkspaceNavbarProps) {
     const router = useRouter();
     const { user, signOut } = useAuth();
+    const [creditOpen, setCreditOpen] = useState(false);
 
     const avatarUrl =
         (user?.user_metadata?.avatar_url as string | undefined) ??
@@ -183,6 +203,19 @@ export function WorkspaceNavbar({ className, search, onSearchChange }: Workspace
 
                         <div className="my-1 h-px bg-white/10" />
 
+                        {/* Buy Credit — opens the credit/payment modal */}
+                        <button
+                            type="button"
+                            onClick={() => setCreditOpen(true)}
+                            className={cn(
+                                'flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-xs font-medium text-white/70',
+                                'transition-colors hover:bg-white/10 hover:text-white'
+                            )}
+                        >
+                            <StarIcon className="shrink-0 text-[#FFF991]" />
+                            Buy Credit
+                        </button>
+
                         {/* Sign out */}
                         <button
                             type="button"
@@ -198,6 +231,8 @@ export function WorkspaceNavbar({ className, search, onSearchChange }: Workspace
                     </div>
                 </div>
             </div>
+
+            <CreditModal open={creditOpen} onClose={() => setCreditOpen(false)} />
         </nav>
     );
 }
