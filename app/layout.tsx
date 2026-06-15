@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Pirata_One, Schoolbell } from "next/font/google";
+import { Geist, Geist_Mono, Pirata_One, Schoolbell, Black_Han_Sans } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth-provider";
 
@@ -25,6 +25,13 @@ const schoolBell = Schoolbell({
   weight: "400",
 });
 
+// Korean display face for the hero headline.
+const blackHanSans = Black_Han_Sans({
+  variable: "--font-black-han-sans",
+  subsets: ["latin"],
+  weight: "400",
+});
+
 export const metadata: Metadata = {
   title: "mujic",
   description: "mujic",
@@ -38,7 +45,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${pirataOne.variable} ${schoolBell.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${pirataOne.variable} ${schoolBell.variable} ${blackHanSans.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <AuthProvider>{children}</AuthProvider>

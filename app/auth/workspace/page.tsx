@@ -6,15 +6,17 @@ import { useAuth } from '@/components/auth-provider';
 import { WorkspaceNavbar } from '@/components/workspace/navbar';
 import { PromptInputBox, type GenerateOptions } from '@/components/workspace/prompt-input-box';
 import { MusicList } from '@/components/workspace/music-list';
+import { CreditModal } from '@/components/workspace/credit-modal';
 import { Modal } from '@/components/ui/modal';
 import { MusicPlayer, type MusicPlayerHandle } from '@/components/workspace/music-player';
 import { LoadingLines } from '@/components/workspace/loading-lines';
+import { usePullToRefresh } from '@/lib/use-pull-to-refresh';
 import { cn } from '@/lib/utils';
 import type { Track } from '@/lib/music';
 
 export default function WorkspacePage() {
     const router = useRouter();
-    const { user, loading } = useAuth();
+    const { user, loading, refreshCredits } = useAuth();
 
     const [tracks, setTracks] = useState<Track[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -29,6 +31,18 @@ export default function WorkspacePage() {
 
     // Navbar search — filters the rendered list by the track's display name.
     const [search, setSearch] = useState('');
+
+    // Buy Credit modal — opened from the navbar, or automatically when a
+    // generation is rejected for insufficient credits.
+    const [creditModalOpen, setCreditModalOpen] = useState(false);
+
+    // Pull-to-refresh: the list scrolls inside an inner container, so the browser's
+    // native gesture never fires. Dragging down from the top reloads the page.
+    const {
+        ref: scrollRef,
+        pull,
+        refreshing,
+    } = usePullToRefresh<HTMLDivElement>(() => window.location.reload());
 
     // Clicking the active track toggles play/pause; any other track switches to it.
     const handleSelect = (trackId: string) => {
@@ -103,6 +117,10 @@ export default function WorkspacePage() {
             });
             const data = await res.json();
             if (!res.ok) {
+                // Out of credits — surface the Buy Credit modal so they can top up.
+                if (res.status === 402) {
+                    setCreditModalOpen(true);
+                }
                 throw new Error(data.error || 'Generation failed');
             }
             const newTracks = (data.tracks ?? []) as Track[];
@@ -116,6 +134,8 @@ export default function WorkspacePage() {
             setError(err instanceof Error ? err.message : 'Something went wrong');
         } finally {
             setIsGenerating(false);
+            // Reflect the new balance (charged on success, refunded on failure).
+            refreshCredits();
         }
     };
 
@@ -186,15 +206,45 @@ export default function WorkspacePage() {
 
     return (
         <main className="relative flex min-h-screen w-full flex-col bg-[#171717] font-sans text-white">
-            <WorkspaceNavbar search={search} onSearchChange={setSearch} />
+            <WorkspaceNavbar
+                search={search}
+                onSearchChange={setSearch}
+                onBuyCredit={() => setCreditModalOpen(true)}
+            />
 
             {/* Center content area — the user's track list */}
             <div
+                ref={scrollRef}
                 className={cn(
                     'flex-1 overflow-y-auto px-4 pt-6',
                     hasPlayer ? 'pb-56' : 'pb-44'
                 )}
             >
+                {/* Pull-to-refresh indicator (mobile) — height tracks the drag distance. */}
+                <div
+                    className="flex items-end justify-center overflow-hidden"
+                    style={{
+                        height: pull,
+                        transition: refreshing || pull === 0 ? 'height 0.2s ease-out' : 'none',
+                    }}
+                >
+                    <svg
+                        className={cn('mb-2 text-white/60', refreshing && 'animate-spin')}
+                        style={{ opacity: Math.min(pull / 70, 1) }}
+                        width="22"
+                        height="22"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                    >
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                    </svg>
+                </div>
+
                 <div className="mx-auto flex w-full max-w-xl flex-col items-center gap-4">
                     {isGenerating && <LoadingLines />}
 
@@ -271,6 +321,9 @@ export default function WorkspacePage() {
                 onPlayingChange={setIsPlaying}
                 onClose={() => setCurrentTrackId(null)}
             />
+
+            {/* Buy Credit modal — navbar shortcut + auto-opens when out of credits */}
+            <CreditModal open={creditModalOpen} onClose={() => setCreditModalOpen(false)} />
 
             {/* Rename dialog */}
             <Modal

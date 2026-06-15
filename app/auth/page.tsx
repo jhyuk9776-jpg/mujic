@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { useState } from 'react';
 import { useAuth } from '@/components/auth-provider';
+import { HomeLink } from '@/components/site/home-link';
 
 const GoogleIcon = () => (
     <svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true">
@@ -49,9 +50,12 @@ export default function AuthPage() {
             >
                 <div className="flex flex-col items-center text-center">
                     {/* Wordmark */}
-                    <span className="text-3xl text-white" style={{ fontFamily: 'var(--font-school-bell)' }}>
+                    <HomeLink
+                        className="text-3xl text-white transition-opacity hover:opacity-80"
+                        style={{ fontFamily: 'var(--font-school-bell)' }}
+                    >
                         mujic.
-                    </span>
+                    </HomeLink>
 
                     <h1 className="mt-8 text-lg font-semibold tracking-tight text-white">
                         Create your sound
@@ -73,11 +77,11 @@ export default function AuthPage() {
 
                     <p className="mt-6 max-w-[15rem] text-[0.6875rem] leading-relaxed text-white/30">
                         By continuing, you agree to our{' '}
-                        <a href="#" className="text-white/55 underline-offset-2 transition-colors hover:text-white/80 hover:underline">
+                        <a href="/terms" className="text-white/55 underline-offset-2 transition-colors hover:text-white/80 hover:underline">
                             Terms
                         </a>{' '}
                         and{' '}
-                        <a href="#" className="text-white/55 underline-offset-2 transition-colors hover:text-white/80 hover:underline">
+                        <a href="/privacy" className="text-white/55 underline-offset-2 transition-colors hover:text-white/80 hover:underline">
                             Privacy Policy
                         </a>
                         .

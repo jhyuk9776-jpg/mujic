@@ -1,10 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth-provider';
+import { HomeLink } from '@/components/site/home-link';
 import { cn } from '@/lib/utils';
-import { CreditModal } from '@/components/workspace/credit-modal';
 
 const StarIcon = ({ className }: { className?: string }) => (
     <svg
@@ -64,12 +63,13 @@ interface WorkspaceNavbarProps {
     className?: string;
     search?: string;
     onSearchChange?: (value: string) => void;
+    /** Opens the Buy Credit modal (owned by the page so other flows can open it too). */
+    onBuyCredit?: () => void;
 }
 
-export function WorkspaceNavbar({ className, search, onSearchChange }: WorkspaceNavbarProps) {
+export function WorkspaceNavbar({ className, search, onSearchChange, onBuyCredit }: WorkspaceNavbarProps) {
     const router = useRouter();
-    const { user, signOut } = useAuth();
-    const [creditOpen, setCreditOpen] = useState(false);
+    const { user, signOut, credits } = useAuth();
 
     const avatarUrl =
         (user?.user_metadata?.avatar_url as string | undefined) ??
@@ -93,13 +93,13 @@ export function WorkspaceNavbar({ className, search, onSearchChange }: Workspace
                 className
             )}
         >
-            {/* Left — wordmark */}
-            <span
-                className="shrink-0 text-2xl text-white"
+            {/* Left — wordmark (returns to the landing page) */}
+            <HomeLink
+                className="shrink-0 text-2xl text-white transition-opacity hover:opacity-80"
                 style={{ fontFamily: 'var(--font-school-bell)' }}
             >
                 mujic.
-            </span>
+            </HomeLink>
 
             {/* Center — liquid glass search field (filters the track list by title) */}
             <div className="relative flex max-w-md flex-1 items-center">
@@ -138,7 +138,25 @@ export function WorkspaceNavbar({ className, search, onSearchChange }: Workspace
             </div>
 
             {/* Right — profile popover (hover reveals sign out) */}
-            <div className="group relative shrink-0">
+            <div className="group relative flex shrink-0 items-center gap-2.5">
+                {/* Credit balance — also a shortcut into the Buy Credit modal */}
+                <button
+                    type="button"
+                    onClick={onBuyCredit}
+                    aria-label="Credits"
+                    className={cn(
+                        'flex items-center gap-1.5 rounded-full px-3 py-1.5',
+                        'border border-white/10 bg-white/[0.06] backdrop-blur-xl',
+                        'shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12)]',
+                        'transition-colors hover:border-white/20 hover:bg-white/[0.1]'
+                    )}
+                >
+                    <StarIcon className="shrink-0 text-[#FFF991]" />
+                    <span className="text-xs font-medium tabular-nums text-white/90">
+                        {credits ?? '—'}
+                    </span>
+                </button>
+
                 {/* Trigger: avatar */}
                 <button
                     type="button"
@@ -203,10 +221,21 @@ export function WorkspaceNavbar({ className, search, onSearchChange }: Workspace
 
                         <div className="my-1 h-px bg-white/10" />
 
+                        {/* Credit balance */}
+                        <div className="flex items-center justify-between px-2.5 py-2">
+                            <span className="flex items-center gap-2 text-xs font-medium text-white/70">
+                                <StarIcon className="shrink-0 text-[#FFF991]" />
+                                Credits
+                            </span>
+                            <span className="text-xs font-semibold tabular-nums text-white">
+                                {credits ?? '—'}
+                            </span>
+                        </div>
+
                         {/* Buy Credit — opens the credit/payment modal */}
                         <button
                             type="button"
-                            onClick={() => setCreditOpen(true)}
+                            onClick={onBuyCredit}
                             className={cn(
                                 'flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-xs font-medium text-white/70',
                                 'transition-colors hover:bg-white/10 hover:text-white'
@@ -231,8 +260,6 @@ export function WorkspaceNavbar({ className, search, onSearchChange }: Workspace
                     </div>
                 </div>
             </div>
-
-            <CreditModal open={creditOpen} onClose={() => setCreditOpen(false)} />
         </nav>
     );
 }

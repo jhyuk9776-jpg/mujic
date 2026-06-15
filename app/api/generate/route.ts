@@ -1,6 +1,7 @@
 import Replicate from 'replicate';
 import { createClient } from '@/lib/supabase/server';
 import { MUSIC_BUCKET, MUSIC_COLUMNS, buildTracks, type MusicRow } from '@/lib/music';
+import { creditCost } from '@/lib/credits';
 
 // Music generation can involve a model cold start, so give it plenty of room.
 // (Only enforced by deploy platforms; local dev is unbounded.)
@@ -68,6 +69,29 @@ export async function POST(request: Request) {
       ? clamp(Math.round(body.batch_size), MIN_BATCH, MAX_BATCH)
       : 1;
 
+  // Charge credits up front (longer tracks and bigger batches cost more). The
+  // RPC deducts atomically and returns NULL when the balance is too low.
+  //
+  // NOTE (known limitation): spend_credits / refund_credits are exposed to the
+  // `authenticated` role so this route can call them with the user session. That
+  // means a user could call refund_credits directly to mint credits. Acceptable
+  // pre-launch; before wiring real payments, move these mutations behind a
+  // service-role client and revoke EXECUTE from `authenticated`.
+  const cost = creditCost(duration, batchSize);
+  const { data: balanceAfterSpend, error: spendError } = await supabase.rpc('spend_credits', {
+    p_amount: cost,
+  });
+  if (spendError) {
+    console.error('failed to spend credits:', spendError);
+    return Response.json({ error: 'Failed to reserve credits. Please try again.' }, { status: 500 });
+  }
+  if (balanceAfterSpend === null) {
+    return Response.json(
+      { error: '크레딧이 부족합니다. 크레딧을 구매한 뒤 다시 시도해주세요.' },
+      { status: 402 }
+    );
+  }
+
   try {
     const output = await replicate.run(ACE_STEP, {
       input: {
@@ -127,9 +151,15 @@ export async function POST(request: Request) {
     }
 
     const tracks = await buildTracks(supabase, rows);
-    return Response.json({ tracks });
+    return Response.json({ tracks, credits: balanceAfterSpend });
   } catch (err) {
     console.error('music generation failed:', err);
+
+    // Generation failed after we charged for it — give the credits back.
+    const { error: refundError } = await supabase.rpc('refund_credits', { p_amount: cost });
+    if (refundError) {
+      console.error('failed to refund credits:', refundError);
+    }
 
     // Surface actionable Replicate errors (e.g. billing) instead of a generic message.
     const status =

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 
@@ -66,11 +66,6 @@ function PlanCard({ plan }: { plan: Plan }) {
 }
 
 export function CreditModal({ open, onClose }: CreditModalProps) {
-    const [mounted, setMounted] = useState(false);
-
-    // Portals need a DOM target, which only exists on the client.
-    useEffect(() => setMounted(true), []);
-
     // Close on Escape while the modal is open.
     useEffect(() => {
         if (!open) return;
@@ -81,7 +76,9 @@ export function CreditModal({ open, onClose }: CreditModalProps) {
         return () => document.removeEventListener('keydown', onKey);
     }, [open, onClose]);
 
-    if (!mounted || !open) return null;
+    // The modal only opens from a client interaction, so `open` is always false
+    // during SSR — guard the portal target for the server render regardless.
+    if (!open || typeof document === 'undefined') return null;
 
     return createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">

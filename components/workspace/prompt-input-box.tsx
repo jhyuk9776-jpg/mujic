@@ -3,9 +3,10 @@
 import React from 'react';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
-import { ArrowUp, Square, Mic2, Clock, Layers, Check } from 'lucide-react';
+import { ArrowUp, Square, Mic2, Clock, Layers, Check, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Modal } from '@/components/ui/modal';
+import { creditCost, durationSurcharge, batchSurcharge } from '@/lib/credits';
 
 // Options collected alongside the prompt and passed to the generation API.
 export interface GenerateOptions {
@@ -259,6 +260,14 @@ const OptionRow: React.FC<OptionRowProps> = ({ selected, onSelect, children }) =
   </button>
 );
 
+// Small "+N" badge marking the extra credits an option costs.
+const SurchargeBadge: React.FC<{ amount: number }> = ({ amount }) =>
+  amount > 0 ? (
+    <span className="rounded-full bg-[#FFF991]/15 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-[#FFF991]">
+      +{amount}
+    </span>
+  ) : null;
+
 // Action bar at the bottom of the prompt box.
 type PromptInputActionsProps = React.HTMLAttributes<HTMLDivElement>;
 const PromptInputActions: React.FC<PromptInputActionsProps> = ({ children, className, ...props }) => (
@@ -287,6 +296,9 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
   const hasLyrics = lyrics.trim().length > 0;
   const durationLabel =
     DURATION_OPTIONS.find((o) => o.seconds === duration)?.label ?? `${Math.round(duration / 60)}분`;
+
+  // Credits this generation will cost (base + duration + batch surcharges).
+  const cost = creditCost(duration, batchSize);
 
   const handleSubmit = () => {
     if (!input.trim() || isLoading) return;
@@ -350,7 +362,10 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                         selected={duration === option.seconds}
                         onSelect={() => setDuration(option.seconds)}
                       >
-                        {option.label}
+                        <span className="flex items-center gap-2">
+                          {option.label}
+                          <SurchargeBadge amount={durationSurcharge(option.seconds)} />
+                        </span>
                       </OptionRow>
                     </PopoverPrimitive.Close>
                   ))}
@@ -368,7 +383,10 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                   {BATCH_OPTIONS.map((n) => (
                     <PopoverPrimitive.Close asChild key={n}>
                       <OptionRow selected={batchSize === n} onSelect={() => setBatchSize(n)}>
-                        {n}곡
+                        <span className="flex items-center gap-2">
+                          {n}곡
+                          <SurchargeBadge amount={batchSurcharge(n)} />
+                        </span>
                       </OptionRow>
                     </PopoverPrimitive.Close>
                   ))}
@@ -377,7 +395,21 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
             </PopoverPrimitive.Root>
           </div>
 
-          <Tooltip>
+          <div className="flex items-center gap-2">
+            {/* Credit cost of this generation */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className="flex h-8 items-center gap-1.5 rounded-full bg-[#FFF991]/10 px-2.5 text-xs font-semibold tabular-nums text-[#FFF991]"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {cost}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>이번 생성에 사용되는 크레딧</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="default"
@@ -400,6 +432,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
             </TooltipTrigger>
             <TooltipContent>{isLoading ? '생성 중…' : '생성'}</TooltipContent>
           </Tooltip>
+          </div>
         </PromptInputActions>
       </PromptInput>
 
