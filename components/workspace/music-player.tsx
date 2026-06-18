@@ -13,6 +13,8 @@ import {
   Pause,
   SkipBack,
   SkipForward,
+  Repeat,
+  Repeat1,
   Volume2,
   VolumeX,
   Music,
@@ -26,9 +28,23 @@ interface MusicPlayerProps {
   onPrev?: () => void;
   hasNext?: boolean;
   hasPrev?: boolean;
+  /** Jump back to the first track in the queue (used by "repeat all" at the end). */
+  onRestart?: () => void;
   onPlayingChange?: (playing: boolean) => void;
   onClose?: () => void;
 }
+
+// Repeat behaviour, cycled by the repeat button (Spotify / YouTube Music style):
+//   off → play through the queue and stop at the end
+//   all → at the end of the queue, wrap back to the first track
+//   one → repeat the current track indefinitely
+type RepeatMode = 'off' | 'all' | 'one';
+const REPEAT_ORDER: Record<RepeatMode, RepeatMode> = { off: 'all', all: 'one', one: 'off' };
+const REPEAT_LABEL: Record<RepeatMode, string> = {
+  off: 'Repeat: off',
+  all: 'Repeat: all',
+  one: 'Repeat: one',
+};
 
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
@@ -50,7 +66,7 @@ export interface MusicPlayerHandle {
 }
 
 export const MusicPlayer = forwardRef<MusicPlayerHandle, MusicPlayerProps>(function MusicPlayer(
-  { track, onNext, onPrev, hasNext = false, hasPrev = false, onPlayingChange, onClose },
+  { track, onNext, onPrev, hasNext = false, hasPrev = false, onRestart, onPlayingChange, onClose },
   ref
 ) {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -59,6 +75,14 @@ export const MusicPlayer = forwardRef<MusicPlayerHandle, MusicPlayerProps>(funct
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>('off');
+
+  // "Repeat one" is handled by the element's native loop so the track restarts
+  // seamlessly (no `ended` event fires); the other modes are handled in onEnded.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) audio.loop = repeatMode === 'one';
+  }, [repeatMode, track?.id]);
 
   // Autoplay whenever the selected track changes.
   useEffect(() => {
@@ -70,6 +94,16 @@ export const MusicPlayer = forwardRef<MusicPlayerHandle, MusicPlayerProps>(funct
       /* Autoplay may be blocked until the user interacts — stay paused. */
     });
   }, [track?.id, track?.audioUrl]);
+
+  // Stop playback when the player unmounts (e.g. navigating to another screen).
+  // A removed-but-detached <audio> element keeps playing in the background until
+  // it's explicitly paused, so pause it here to stop the sound on navigation.
+  useEffect(() => {
+    const audio = audioRef.current;
+    return () => {
+      audio?.pause();
+    };
+  }, []);
 
   // Mirror volume/mute onto the element.
   useEffect(() => {
@@ -119,8 +153,15 @@ export const MusicPlayer = forwardRef<MusicPlayerHandle, MusicPlayerProps>(funct
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
         onEnded={() => {
-          setIsPlaying(false);
-          if (hasNext) onNext?.();
+          // "Repeat one" never reaches here (native loop). For the rest: advance
+          // to the next track, and on "repeat all" wrap to the start at the end.
+          if (hasNext) {
+            onNext?.();
+          } else if (repeatMode === 'all') {
+            onRestart?.();
+          } else {
+            setIsPlaying(false);
+          }
         }}
       />
 
@@ -182,6 +223,28 @@ export const MusicPlayer = forwardRef<MusicPlayerHandle, MusicPlayerProps>(funct
             aria-label="Next track"
           >
             <SkipForward className="h-5 w-5 fill-current" />
+          </button>
+          {/* Repeat — cycles off → all → one (Spotify / YouTube Music style). */}
+          <button
+            type="button"
+            onClick={() => setRepeatMode((m) => REPEAT_ORDER[m])}
+            className="relative transition-colors hover:text-white"
+            style={{ color: repeatMode === 'off' ? undefined : GOLD }}
+            aria-label={REPEAT_LABEL[repeatMode]}
+            title={REPEAT_LABEL[repeatMode]}
+          >
+            {repeatMode === 'one' ? (
+              <Repeat1 className="h-5 w-5" />
+            ) : (
+              <Repeat className={repeatMode === 'off' ? 'h-5 w-5 text-gray-300' : 'h-5 w-5'} />
+            )}
+            {/* Active-state dot, matching Spotify's repeat indicator. */}
+            {repeatMode !== 'off' && (
+              <span
+                className="absolute -bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full"
+                style={{ backgroundColor: GOLD }}
+              />
+            )}
           </button>
         </div>
 

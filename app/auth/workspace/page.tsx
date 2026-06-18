@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth-provider';
+import { useGeneration } from '@/components/generation-provider';
 import { WorkspaceNavbar } from '@/components/workspace/navbar';
 import { PromptInputBox, type GenerateOptions } from '@/components/workspace/prompt-input-box';
 import { MusicList } from '@/components/workspace/music-list';
@@ -16,12 +17,25 @@ import type { Track } from '@/lib/music';
 
 export default function WorkspacePage() {
     const router = useRouter();
-    const { user, loading, refreshCredits } = useAuth();
+    const { user, loading } = useAuth();
+    // Generation lives in a root-level provider so an in-flight request (and its
+    // loading screen) survives navigating away from the workspace and back.
+    const {
+        isGenerating,
+        error: generationError,
+        result,
+        generate,
+        clearResult,
+        insufficientCredit,
+        clearInsufficientCredit,
+    } = useGeneration();
 
     const [tracks, setTracks] = useState<Track[]>([]);
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [error, setError] = useState<string | null>(null);
     const [currentTrackId, setCurrentTrackId] = useState<string | null>(null);
+    // Local errors not tied to generation (e.g. a failed download).
+    const [downloadError, setDownloadError] = useState<string | null>(null);
+    // Shown in the list area — whichever error is currently active.
+    const error = generationError ?? downloadError;
     const [isPlaying, setIsPlaying] = useState(false);
     const playerRef = useRef<MusicPlayerHandle>(null);
 
@@ -92,51 +106,35 @@ export default function WorkspacePage() {
         });
     }, [tracks]);
 
+    // A generation finished — merge its tracks into the list (de-duping against
+    // any already loaded from /api/musics) and auto-play the first one. We adjust
+    // state during render (keyed on the result token) rather than in an effect so
+    // it applies even when the request completed while the user was on another
+    // screen; the provider's result is then cleared in the effect below.
+    const [consumedToken, setConsumedToken] = useState<number | null>(null);
+    if (result && result.token !== consumedToken) {
+        setConsumedToken(result.token);
+        setTracks((prev) => {
+            const seen = new Set(prev.map((t) => t.id));
+            const fresh = result.tracks.filter((t) => !seen.has(t.id));
+            return fresh.length ? [...fresh, ...prev] : prev;
+        });
+        setCurrentTrackId(result.tracks[0].id);
+    }
+
+    // Once consumed, clear the provider's result so it isn't re-applied on a
+    // future remount. (Cross-provider update belongs in an effect, not render.)
+    useEffect(() => {
+        if (result && result.token === consumedToken) clearResult();
+    }, [result, consumedToken, clearResult]);
+
     // Hold the page blank until we know whether there's a session.
     if (loading || !user) {
         return <main className="min-h-screen w-full bg-[#171717]" />;
     }
 
-    const handleSend = async (message: string, options: GenerateOptions) => {
-        const prompt = message.trim();
-        if (!prompt || isGenerating) return;
-
-        setIsGenerating(true);
-        setError(null);
-
-        try {
-            const res = await fetch('/api/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    prompt,
-                    lyrics: options.lyrics,
-                    duration: options.duration,
-                    batch_size: options.batchSize,
-                }),
-            });
-            const data = await res.json();
-            if (!res.ok) {
-                // Out of credits — surface the Buy Credit modal so they can top up.
-                if (res.status === 402) {
-                    setCreditModalOpen(true);
-                }
-                throw new Error(data.error || 'Generation failed');
-            }
-            const newTracks = (data.tracks ?? []) as Track[];
-            if (newTracks.length === 0) {
-                throw new Error('No tracks were generated.');
-            }
-            setTracks((prev) => [...newTracks, ...prev]);
-            // Auto-play the first freshly generated track.
-            setCurrentTrackId(newTracks[0].id);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Something went wrong');
-        } finally {
-            setIsGenerating(false);
-            // Reflect the new balance (charged on success, refunded on failure).
-            refreshCredits();
-        }
+    const handleSend = (message: string, options: GenerateOptions) => {
+        void generate(message, options);
     };
 
     // Open the rename dialog seeded with the track's current name.
@@ -177,6 +175,7 @@ export default function WorkspacePage() {
 
     const handleDownload = async (track: Track) => {
         if (!track.audioUrl) return;
+        setDownloadError(null);
         try {
             const res = await fetch(track.audioUrl);
             const blob = await res.blob();
@@ -189,7 +188,7 @@ export default function WorkspacePage() {
             a.remove();
             URL.revokeObjectURL(url);
         } catch {
-            setError('Download failed. Please try again.');
+            setDownloadError('Download failed. Please try again.');
         }
     };
 
@@ -318,12 +317,21 @@ export default function WorkspacePage() {
                 onNext={goNext}
                 hasPrev={currentIndex > 0}
                 hasNext={currentIndex >= 0 && currentIndex < tracks.length - 1}
+                // "Repeat all" wraps past the oldest track back to the newest (top of list).
+                onRestart={() => tracks.length > 0 && setCurrentTrackId(tracks[0].id)}
                 onPlayingChange={setIsPlaying}
                 onClose={() => setCurrentTrackId(null)}
             />
 
-            {/* Buy Credit modal — navbar shortcut + auto-opens when out of credits */}
-            <CreditModal open={creditModalOpen} onClose={() => setCreditModalOpen(false)} />
+            {/* Buy Credit modal — navbar shortcut, plus auto-opens (derived from the
+                provider's flag) when a generation is rejected for insufficient credits. */}
+            <CreditModal
+                open={creditModalOpen || insufficientCredit}
+                onClose={() => {
+                    setCreditModalOpen(false);
+                    clearInsufficientCredit();
+                }}
+            />
 
             {/* Rename dialog */}
             <Modal
